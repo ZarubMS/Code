@@ -28,9 +28,6 @@ class Base():
 	def read_config(self, path):
 		with open(path, 'r', encoding='utf-8') as f:
 			return json.load(f)
-		
-
-
 
 	def __init__(self, path):
 		'''
@@ -54,9 +51,7 @@ class Base():
                                                            "config.json"))
 		self.file_name = self.config["file_name"]
 		self.success_codes = self.config["success_codes"]
-				
 		print("Инициация загрузчика завешена.")
-
 
 	def exp_delay(self, retry_counter, start_delay=20):
 		"""
@@ -68,7 +63,19 @@ class Base():
 		else:
 			sleep_time_source = int(start_delay * 3 ** retry_counter)
 		time.sleep(sleep_time_source)
+
 	
+	#Запись в файл
+	def write_csv(self, data):
+		date = datetime.now()
+		date = datetime.strftime(date, "%Y%m%d")
+		columns_names = self.config["csv_headers"]
+		self.path_csv = self.get_parent_path()+"/"+"DATA/"+self.file_name+date+".csv"
+		with open (self.path_csv, 'w', newline='') as f:
+			wr = csv.writer(f)
+			wr.writerow(self.config["csv_headers"])
+			wr.writerows(data)
+		print("Запись завершена в ", self.path_csv)
 	
 	def to_gzip(self, path):
 		with open (path, 'rb') as f_in:
