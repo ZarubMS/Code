@@ -9,6 +9,7 @@ from Base import Base
 
 
 
+
 path_file = os.path.realpath(__file__)
 
 class mostrans_appmetrica(Base):
@@ -28,7 +29,7 @@ class mostrans_appmetrica(Base):
 				url += kwargs[key]
 		print(url)
 		main_params = dict(url = url, headers = headers, request_params = request_params)
-		return main_params
+		return main_params 
 			
 	#парсим JSON
 	def read_json(self, load_data):
@@ -39,7 +40,7 @@ class mostrans_appmetrica(Base):
 		a.append(load_data['time_intervals'][0][0])
 		a.append(load_data['query']['ids'][0])
 		a.append(load_data['query']['metrics'][0])
-		a.append(load_data['totals'][0])
+		a.append(load_data['totals'][0][0])
 		print("Парсинг завершен")		
 		return a
 	
@@ -59,62 +60,46 @@ class mostrans_appmetrica(Base):
 		print("Парсинг завершен")
 		return data
 	
-	def request_toDF(self, params, **kwargs):
+	def request_to_list(self, params, **kwargs):
 		all_params = self.get_params_loader(params, **kwargs)
 		load_data = self.load_request(all_params)
 		return load_data
 
-	#Запись в файл
-	def write_csv(self, data):
-		date = datetime.now()
-		date = datetime.strftime(date, "%Y%m%d")
-		columns_names = self.config["csv_headers"]
-		self.path_csv = self.get_parent_path()+"/"+"DATA/"+self.file_name+date+".csv"
-		with open (self.path_csv, 'w', newline='') as f:
-			wr = csv.writer(f)
-			wr.writerow(self.config["csv_headers"])
-			wr.writerows(data)
-		print("Запись завершена в ", self.path_csv)
 
 	def run(self):
 		df = []
+
 		#запросы для каждого id и метрик "ym:s:avgSessionDuration", "ym:s:sessionsPerUser"
 		for i in range(3):
 			for j in range(2):
 
-				load_data = self.request_toDF(self.config["first_request_params"]["const_params"],
+				load_data = self.request_to_list(self.config["first_request_params"]["const_params"],
 									id = self.config["first_request_params"]["variable_params"]["ids"][i],
 									metrics = self.config["first_request_params"]["variable_params"]["metrics"][j])
 				data = self.read_json(load_data)
 				df.append(data)
-		#запросы для каждого id и первых 30 метрик
+		#запросы для каждого id и всяких разных метрик
 		for i in range(3):
-			count_metrics = 29
-			load_data = self.request_toDF(self.config["second_request_params"]["const_params"],
-									id = self.config["second_request_params"]["variable_params"]["ids"][i],
-									add_url = '?row_ids=[[null]%2C["_taxi"]%2C["_scooter"]%2C["_bike"]%2C["_bike_scooter"]%2C["_taxi_scooter"]%2C' +
-				 '["_taxi_bike"]%2C["_taxi_bike_scooter"]%2C["carsharing"]%2C["carshering_"]%2C["carsharing_taxi"]%2C["carsharing_scooter"]%2C' +
-				 '["carsharing_bike"]%2C["carsharing__taxi"]%2C["carsharing__scooter"]%2C["carsharing__bike"]%2C["carsharing_bike_scooter"]%2C'+
-				 '["carsharing_taxi_bike"]%2C["carsharing_bike_scooter"]%2C["carsharing__taxi_scooter"]%2C["carsharing__taxi_bike"]%2C' +
-				 '["carsharing__bike_scooter"]%2C["carsharing_taxi_bike_scooter"]%2C["carsharing__taxi_bike_scooter"]%2C["taxi"]%2C' +
-				 '["taxi_"]%2C["taxi_scooter"]%2C["taxi_bike"]%2C["taxi__scooter"]%2C["taxi__bike"]]',
-			  					headers = self.config["headers"])
-			data = self.read_json2(load_data, count_metrics)
-			df = df + data
-		#запросы для каждого id и ещё 11 метрик
-		for i in range(3):
-			count_metrics = 11
-			load_data = self.request_toDF(self.config["second_request_params"]["const_params"],
-									id = self.config["second_request_params"]["variable_params"]["ids"][i],
-									add_url = "?row_ids=%5B%5B%22taxi_carsharing_%22%5D%2C%5B%22taxi_carsharing_scooter%22%5D%2C%5B%22taxi_bike_scooter%22%5D%2C%"+
-			   "5B%22taxi__bike_scooter%22%5D%2C%5B%22taxi_carsharing__scooter%22%5D%2C%5B%22taxi_carsharing__bike%22%5D%2C%"+
-			   "5B%22taxi_carsharing_bike_scooter%22%5D%2C%5B%22taxi_carsharing__bike_scooter%22%5D%2C%5B%22scooter%22%5D%2C%"+
-			   "5B%22bike%22%5D%2C%5B%22bike_scooter%22%5D%2C%5B%22notMultiModalRoute%22%5D%5D", headers=self.config["headers"])
-			data = self.read_json2(load_data, count_metrics)
-			df = df + data
+			for j in range(2):
+				row_ids_list = self.config["second_request_params"]["row_ids"][j]
+				row_id1 = str(row_ids_list)
+				if j == 0:
+					row_id2 = row_id1[:1] + "[null]," + row_id1[1:]
+				else:
+					row_id2 = row_id1
+				row_ids = row_id2.replace(" ", "").replace("\'", "\"")
+				count_metrics = len(row_ids_list)
+				load_data = self.request_to_list(self.config["second_request_params"]["const_params"],
+										id = self.config["second_request_params"]["variable_params"]["ids"][i],
+										row_ids = row_ids,
+									headers = self.config["headers"])
+				data = self.read_json2(load_data, count_metrics - 1)
+				df = df + data
 		
 		self.write_csv(df)
 		self.to_gzip(self.path_csv)
+
+		
 
  
 
